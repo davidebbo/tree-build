@@ -96,6 +96,17 @@ def prune_non_species(
     return nodes_removed
 
 
+def print_node_parent_chain_info(self, label):
+    # Find the node with that label and print out its age
+    for node in self.preorder_node_iter():
+        if node.label == label:
+            logging.warning(f"{node.label},{node.edge.length},{node.age}")
+
+            # go through the whole parent chain, each time printing the label, edge length and age
+            for n in node.ancestor_iter():
+                logging.warning(f"{n.label},{n.edge.length},{n.age}")
+
+
 def set_node_ages(self):
     """
     Adds an attribute called 'age' to each node, with the value equal to
@@ -109,6 +120,10 @@ def set_node_ages(self):
 
     Returns number of nodes with age set, and number of deleted extinction props
     """
+
+    target_taxon = "Ichthyomyzon bdellium"
+    print_node_parent_chain_info(self, target_taxon)
+
     # Percolate age up the tree (go from tips upwards, assuming all tips at 0Ma)
     # Where children disagree on the age of their parent, take the larger number
     tot_ages = 0
@@ -121,6 +136,11 @@ def set_node_ages(self):
                 if l < 0:
                     logging.warning(f"length <0 for {node.label}")
                 l = 0 if l < 0 else l
+                if node.label == target_taxon or node.parent_node.label == target_taxon:
+                    logging.warning("WXYZ!!")
+                    logging.warning(
+                        f"Parent: '{node.parent_node.label}' (age: {node.parent_node.age}), child: '{node.label}' (age: {node.age}, length: {l})"
+                    )
                 if getattr(node.parent_node, "age", None) is None:
                     node.parent_node.age = node.age + l
                     tot_ages += 1
@@ -135,6 +155,22 @@ def set_node_ages(self):
                             f"node '{node.label}' of age {node.age}, attached by a "
                             f"branch of length {l}, which sums to {node.age+l}."
                         )
+                # if node.parent_node.age > 100:
+                #     # e.g. 225.037518 --> 2250.0 --> 225.0
+                #     # node.parent_node.age = node.parent_node.age // 0.1 / 10
+                #     original_age = node.parent_node.age
+                #     rounded_age = round(original_age, 1)
+                #     if rounded_age < original_age:
+                #         node.parent_node.age = rounded_age
+                #     logging.warning(
+                #         f"Original for {node.parent_node.label}: {original_age} --> {node.parent_node.age}. Node: {node.label}, {node.age}, {node.edge.length}"
+                #     )
+                if node.label == target_taxon or node.parent_node.label == target_taxon:
+                    logging.warning(
+                        f"Parent: '{node.parent_node.label}' (age: {node.parent_node.age}), child: '{node.label}' (age: {node.age}, length: {l})"
+                    )
+
+    print_node_parent_chain_info(self, target_taxon)
 
     # For newly fixed ages, now percolate them down the tree if we know the age of a deeper node
     for node in self.preorder_node_iter():
@@ -142,7 +178,20 @@ def set_node_ages(self):
             for ch in node.child_node_iter():
                 if getattr(ch, "age", None) is None and ch.edge.length is not None:
                     ch.age = node.age - (ch.edge.length if ch.edge.length > 0 else 0)
+                    if ch.age > 0 and ch.age < 0.05:
+                        logging.warning(
+                            f"Not setting age of {ch.age} on {ch.label} as it's too small (parent: {node.label})"
+                        )
+                        ch.age = 0
+                    else:
+                        logging.warning(
+                            f"Setting age of {ch.age} on {ch.label} (parent: {node.label})"
+                        )
                     tot_ages += 1
+                if ch.age is not None and ch.age < 0:
+                    logging.warning(f"Negative age for {ch.label}")
+
+    print_node_parent_chain_info(self, target_taxon)
 
     # Now that we have calculated dates, remove 'extinction props', and flag up extinct species
     removed = 0
