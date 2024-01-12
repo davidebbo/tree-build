@@ -107,7 +107,12 @@ def main():
         help="the number of spaces for each indentation level",
     )
     args = parser.parse_args()
-    format(args.treefile.read(), args.outputfile, args.indent_spaces)
+    try:
+        format(args.treefile.read(), args.outputfile, args.indent_spaces)
+    except BrokenPipeError:
+        # This can happen when piping the output.
+        # Just ignore it
+        pass
 
 
 if __name__ == "__main__":
